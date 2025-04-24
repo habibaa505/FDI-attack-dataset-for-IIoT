@@ -1,0 +1,135 @@
+#Step 1
+
+import pandas as pd 
+
+import numpy as np 
+
+import seaborn as sns
+
+import matplotlib.pyplot as plt
+
+%matplotlib inline 
+
+import warnings
+warnings.filterwarnings('ignore')
+
+
+
+#Step 2
+
+df= pd.read_csv('D:/Dataset/UKMNCT_IIoT_FDIA.csv')
+
+df =df[~df.isin([np.nan, np.inf, -np.inf]).any(1)]
+df.head()
+
+#Step 3
+df =df[~df.isin([np.nan, np.inf, -np.inf]).any(1)]
+df.head()
+
+#Step 4
+
+from sklearn.preprocessing import LabelEncoder
+encoder = LabelEncoder()
+df['marker'] = encoder.fit_transform(df['marker'])
+df.head()
+
+#Step 5
+
+X = df.drop('marker',axis=1)
+y = df['marker']
+
+from sklearn.model_selection import train_test_split
+X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=.2,random_state=21)
+
+#Step 6
+#GradientBoostingClassifier
+
+from sklearn.ensemble import GradientBoostingClassifier
+
+GradientBoostingClassifier = GradientBoostingClassifier()
+GradientBoostingClassifier.fit(X_train, y_train)
+y_pred_GradientBoostingClassifier = GradientBoostingClassifier.predict(X_test)
+acc_GradientBoostingClassifier = round(accuracy_score(y_test,y_pred_GradientBoostingClassifier)*100,2)
+
+
+print(f"\033[031m\033[1m","Train set score: {:.2f}".format(GradientBoostingClassifier.score(X_train, y_train)))
+print(f"\033[031m\033[1m","Accuracy Score : {:.2f}".format(accuracy_score(y_test,y_pred_GradientBoostingClassifier)))
+print(f"\033[031m\033[1m","Precision Score: {:.2f}".format(precision_score(y_test,y_pred_GradientBoostingClassifier)))
+print(f"\033[031m\033[1m","Recall Score   : {:.2f}".format(recall_score(y_test,y_pred_GradientBoostingClassifier)))
+print(f"\033[031m\033[1m","f1 Score       : {:.2f}".format(f1_score(y_test,y_pred_GradientBoostingClassifier)),'\n')
+print(f"\033[032m\033[1m","Classification Report:\n", classification_report(y_test,y_pred_GradientBoostingClassifier),'\n')
+print(f"\033[034m\033[1m","Confusion Matrix:\n",confusion_matrix(y_test,y_pred_GradientBoostingClassifier))
+
+
+cm = confusion_matrix(y_test,y_pred_GradientBoostingClassifier)
+disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+disp.plot()
+plt.title('Confusion Matrix')
+plt.show()
+
+#Step 7
+
+from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.metrics import log_loss
+
+def cross_val(X, y, model, params, folds=9,lw=5):
+
+    skf = StratifiedKFold(n_splits=folds, shuffle=True, random_state=21)
+    for fold, (train_idx, test_idx) in enumerate(skf.split(X, y)):
+        print(f"Fold: {fold}")
+        x_train, y_train = X.iloc[train_idx], y.iloc[train_idx]
+        x_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
+
+        alg = model(**params)
+        alg.fit(x_train, y_train,
+                eval_set=[(x_test, y_test)],
+                early_stopping_rounds=100,
+                verbose=400,
+                eval_metric='mlogloss')
+
+        pred = alg.predict_proba(x_test)
+        loss = log_loss(y_test, pred)
+        print(f"Log loss: {loss}")
+        print("-"*50)
+    
+    return alg
+
+
+plt.figure(figsize=(18,12))
+sns.set_theme(style="whitegrid")
+sns.set_context('paper', font_scale=2.5)
+
+from sklearn.ensemble import GradientBoostingClassifier
+
+gbc = GradientBoostingClassifier()
+
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
+
+
+#all_clf=[lr, rf,dtc,svm,gbc,xgbc,etc,abc]
+all_clf=[gbc]
+clf_labels=["GradientBoosting ROC Curve"]
+colors =["red"]
+linestyles = ["-"]
+
+
+
+for clf, label,clr,ls in zip(all_clf, clf_labels, colors, linestyles):
+  y_pred= clf.fit(X_train,y_train).predict_proba(X_test)[:,1]
+  fpr,tpr,thresholds = roc_curve(y_true= y_test, y_score=y_pred)
+  roc_auc= auc(x=fpr, y=tpr)
+  plt.plot(fpr, tpr, color=clr, linestyle=ls,
+           label='%s (AUC for imbalanceed data = %0.5f)' % (label, roc_auc))
+  
+plt.legend(loc='lower right')
+plt.plot([0,1],[0,1],linestyle='--',color='gray',linewidth=3)
+plt.xlim([-0.05,1.1])
+plt.ylim([-0.05,1.1])
+plt.grid(alpha=0.5)
+plt.xlabel('False positive rate (FPR)')
+plt.ylabel('True positive rate (TPR)')
+plt.title('Receiver Operator Characteristic (ROC) Curves for Imbalanceed Data')
+plt.show()
+
+
